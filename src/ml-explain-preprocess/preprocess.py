@@ -144,3 +144,79 @@ def explain_encode(df: pd.DataFrame, method: str = 'auto', columns: list = None,
         plt.close()
 
     return df_copy, report
+
+def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None, visual: bool = False) -> tuple:
+    """
+    Scale numerical features with a detailed & beginner friendly report.
+
+    Parameters:
+    - df: Input Dataframe
+    - method: 'minmax', 'standard', 'robust'.
+    - columns: List of numerical columns (default: auto detect).
+    - visual: If true, histograms before / after.
+
+    Returns:
+    - proccesed_df, report_dict
+    """
+    _validate_df(df)
+    df_copy = df.copy()
+    if columns is None:
+        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+
+    report = {
+        'explanation': "Scaling adjusts numerical features to a common range (e.g., 0 to 1) so that machine learning models treat all features equally. MinMax scales to [0,1], Standard scales to mean=0, std=1, Robust is outlier-resistant.",
+        'parameters': f"Method: {method}, Columns: {columns or 'auto detect numericals'}",
+        'stats': {'before': {}, 'after': {}, 'method': {}},
+        'impact': "",
+        'tips': "Use scaling for algorithms sensitive to feature magnitudes (e.g., SVM, KNN, neural networks). MinMax is good for bounded ranges, Standard for normally distributed data."
+    }
+
+    scalers = {
+        'minmax': MinMaxScaler(),
+        'standard': StandardScaler,
+        'robust': RobustScaler(),
+    }
+    scaler = scalers.get(method, MinMaxScaler())
+
+    for col in columns:
+        stats_before = {
+            'min': df_copy[col].min(),
+            'max': df_copy[col].max(),
+            'mean': df_copy[col].mean(),
+            'std': df_copy[col].std(),
+        }
+        report['stats']['before'][col] = f"Min: {stats_before['min']:.2f}, Max: {stats_before['max']:.2f}, Mean: {stats_before['mean']:.2f}, Std: {stats_before['std']:.2f}"
+
+        df_copy[col] = scaler.fit_transform(df_copy[[col]])
+
+        stats_after = {
+            'min': df_copy[col].min(),
+            'max': df_copy[col].max(),
+            'mean': df_copy[col].mean(),
+            'std': df_copy[col].std(),
+        }
+
+        report['stats']['after'][col] = f"Min: {stats_after['min']:.2f}, Max: {stats_after['max']:.2f}, Mean: {stats_after['mean']:.2f}, Std: {stats_after['std']:.2f}"
+
+        report['stats']['method'][col] = method
+
+    report['impact'] = f"Scaled {len(columns)} numerical columns to {method} range."
+
+    if visual:
+        report['visuals'] = [] 
+        report['visual_descriptions'] = []
+        for col in columns:
+            fig, ax = plt.subplots(1, 2, figsize = (10, 4))
+            fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+            df[col].hist(ax=axs[0], bins=20)
+            axs[0].set_title(f'{col} Before Scaling')
+            df_copy[col].hist(ax=axs[1], bins=20)
+            axs[1].set_title(f'{col} After Scaling')
+            plt.tight_layout()
+            filename = f'reports/scale_{col}.png'
+            report['visuals'].append(filename)
+            report['visual_descriptions'].append(f"Histograms for {col}: Left shows distribution before scaling, right shows after {method} scaling.")
+            plt.savefig(filename)
+            plt.close()
+
+    return df_copy, report
