@@ -206,7 +206,6 @@ def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None
         report['visuals'] = [] 
         report['visual_descriptions'] = []
         for col in columns:
-            fig, ax = plt.subplots(1, 2, figsize = (10, 4))
             fig, axs = plt.subplots(1, 2, figsize=(10, 4))
             df[col].hist(ax=axs[0], bins=20)
             axs[0].set_title(f'{col} Before Scaling')
@@ -216,6 +215,80 @@ def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None
             filename = f'reports/scale_{col}.png'
             report['visuals'].append(filename)
             report['visual_descriptions'].append(f"Histograms for {col}: Left shows distribution before scaling, right shows after {method} scaling.")
+            plt.savefig(filename)
+            plt.close()
+
+    return df_copy, report
+
+def explain_outliers(df: pd.DataFrame, method: str = 'iqr', threshold: float = 1.5, action: str = 'remove', columns: list = None, visual: bool = False) -> tuple:
+    """
+    Detect and handle outliers with a detailed and beginner friendly report.
+
+    Parameters:
+    - df: Input datafram.
+    - method: 'iqr' or 'zscore'.
+    - threshold: For IQR (1.5) or z-score (3).
+    - action: 'remove', 'clip', 'report'.
+    - columns: Numerical columns.
+    - visual: Boxplots before / after.
+
+    Returns:
+    - processed_df, report_dict 
+    """
+    _validate_df(df)
+    df_copy = df.copy()
+    if columns is None:
+        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+
+    report = {
+        'explanation': "Outliers are extreme values that differ significantly from most data points. They can skew model training. IQR uses quartiles to detect outliers, z-score uses standard deviations.",
+        'parameters': f"Method: {method}, Threshold: {threshold}, Action: {action}, Columns: {columns or 'Auto detected numerics'}",
+        'stats': {'outliers_detected': {}, 'count_affected': {}},
+        'impact': {},
+        'tips': "Remove outliers for small datasets or sensitive models (e.g., linear regression). Clip outliers to keep data but reduce their impact. Always inspect outliers to ensure they're not meaningful."
+    }
+
+    total_outliers = 0
+    for col in columns:
+        if method == 'iqr':
+            Q1 = df_copy[col].quantile(0.25)
+            Q3 = df_copy[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower = Q1 - threshold * IQR
+            upper = Q3 + threshold * IQR
+            outliers = ((df_copy[col] < lower) | (df_copy[col] > upper))
+        else:   # zscore
+            z = np.abs((df_copy[col] - df_copy[col].mean()) / df_copy[col].std())
+            outliers = z > threshold
+
+        count_outliers = outliers.sum()
+        total_outliers += count_outliers
+        report['stats']['outliers_detected'][col] = f"{count_outliers} outliers ({count_outliers / len(df) * 100:.1f}%)"
+
+        if action == 'remove':
+            df_copy = df_copy[~outliers]
+            report['stats']['count_affected'][col] = f"Removed {count_outliers} rows"
+        elif action == 'clip':
+            df_copy[col] = np.clip(df_copy[col], lower, upper) if method == 'iqr' else np.clip(df_copy[col], df_copy[col].mean() - threshold * df_copy[col].std(), df_copy[col].mean() + threshold * df_copy[col].std())
+            report['stats']['count_affected'][col] = f"Clipped {count_outliers} values"
+        else:
+            report['stats']['count_affected'][col] = "Reported, no changes"
+
+    report['impact'] = f"Processed {total_outliers} outliers accross {len(columns)} columns."
+
+    if visual:
+        report['visuals'] = []
+        report['visual_descriptions'] = []
+        for col in columns:
+            fig, axs = plt.subplots(1, 2, figsize = (10, 4))
+            sns.boxplot(y=df[col], ax=axs[0])
+            axs[0].set_title(f'{col} Before')
+            sns.boxplot(y=df_copy[col], ax=axs[1])
+            axs[1].set_title(f'{col} After')
+            plt.tight_layout()
+            filename = f'reports/outliers_{col}.png'
+            report['visuals'].append(filename)
+            report['visual_descriptions'].append(f"Boxplots for {col}: Left shows outliers as points beyond whiskers, right shows after {action}.")
             plt.savefig(filename)
             plt.close()
 
