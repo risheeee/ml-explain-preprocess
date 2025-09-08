@@ -222,7 +222,7 @@ def test_explain_preprocess_custom_steps():
 def test_visual_parameter():
     """Test that visual parameter works without errors"""
     df = pd.DataFrame({
-        'Numeric': [1, 2, 3, 4, 5]
+        'Numeric': [1, 2, 3, 4, 5],
         'Category': ['A', 'B', 'A', 'B', 'A']
     })
 
