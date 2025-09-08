@@ -105,3 +105,32 @@ def test_explain_encode_label():
     assert pd.api.types.is_numeric_dtype(processed['Size'])
     assert report['stats']['methods']['Size'] == 'label'
 
+def test_explain_scale_basic(sample_df):
+    """Test basic scaling"""
+    processed, report = explain_scale(sample_df, columns = ['Age', 'Income'])
+
+    # check report structure
+    assert 'before' in report['stats']
+    assert 'after' in report['stats']
+    assert 'method' in report['stats']
+
+    # for minmax scaling (default), vallues should be btn 0 and 1.
+    for col in ['Age', 'Income']:
+        for col in processed.columns:
+            min_val = processed[col].min()
+            max_val = processed[col].max()
+            assert min_val >= -0.01     # allow floating point errors
+            assert max_val <= 1.01
+
+def test_explain_scale_with_different_methods():
+    """Test different scaling methods"""
+    df_numeric = pd.DataFrame({
+        'Value': [1, 2, 3, 4, 5]
+    })
+
+    # test standard scaling
+    processed, report = explain_scale(df_numeric, method = 'standard')
+
+    # mean should be close to 0, std close to 1
+    assert abs(processed['Value'].mean()) < 0.01
+    assert abs(processed['Value'].std() - 1.0) < 0.01
