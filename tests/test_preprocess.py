@@ -134,3 +134,110 @@ def test_explain_scale_with_different_methods():
     # mean should be close to 0, std close to 1
     assert abs(processed['Value'].mean()) < 0.01
     assert abs(processed['Value'].std() - 1.0) < 0.01
+
+def test_explain_outliers_basic(sample_df_with_outliers):
+    """Test outlier detection"""
+    processed, report = explain_outliers(sample_df_with_outliers, action = "report")
+
+    # check report structure
+    assert "outliers_detected" in report['stats']
+    assert "count_affected" in report['stats']
+
+    # should detect outlier in Value1
+    assert "Value1" in report['stats']['outliers_detected']
+
+def test_explain_outliers_remove(sample_df_with_outliers):
+    """Test outlier removal"""
+    original_len = len(sample_df_with_outliers)
+    processed, report = explain_outliers(sample_df_with_outliers, action = "remove")
+
+    # should have lesser columns
+    assert len(processed) <= original_len
+
+def test_explain_outliers_clip():
+    """Test outlier clipping"""
+    df_outliers = pd.DataFrame({
+        'Value': [1, 2, 3, 4, 100]
+    })
+    processed, report = explain_outliers(df_outliers, action = "clip")
+
+    # max value should be reduced from 100
+    assert processed['Value'].max() < 100
+
+def test_explain_select_features_basic(sample_df):
+    """Test feature selection"""
+    processed, report = explain_select_features(sample_df)
+
+    # check report structure
+    assert "dropped" in report['stats']
+    assert "variances" in report['stats']
+
+    # constant column should be dropped
+    assert 'Constant' not in processed.columns
+    assert 'Constant' in report['stats']['dropped']
+
+def test_explain_select_features_threshold():
+    """Tests different thresholds"""
+    df_variance = pd.DataFrame({
+        'LowVar': [1, 1, 1, 1, 2],       # low var
+        'HighVar': [1, 10, 20, 30, 40]     # High var
+    })
+
+    # with higher threshold, both might be dropped
+    processed, report = explain_select_features(df_variance, threshold = 50)
+
+    # with lower threshold only low variance should be dropped
+    processed2, report2 = explain_select_features(df_variance, threshold = 0.1)
+
+    assert 'HighVar' not in processed.columns
+    assert 'HighVar' in processed2.columns
+
+def test_explain_preprocess_basic(sample_df):
+    """Test full preprocessing pipeline"""
+    processed, report = explain_preprocess(sample_df)
+
+    # should return string report
+    assert isinstance(report, str)
+
+    # should have some data
+    assert processed.shape[0] > 0
+    assert processed.shape[1] > 0
+
+    # should not have missing values after preprocesssing
+    assert processed.isnull().sum().sum() == 0
+
+def test_explain_preprocess_with_target(sample_df):
+    """Test entire preprocessing with target column prottection"""
+    processed, report = explain_preprocess(sample_df, target = 'Income')
+
+    # target should be preserved in final df
+    assert 'Income' in processed
+
+def test_explain_preprocess_custom_steps():
+    """Testing preprocessing with custom steps"""
+    processed, report = explain_preprocess(sample_df, steps = ['fill', 'encode'])
+    assert isinstance(report, str)
+    assert processed.shape[0] > 0
+
+def test_visual_parameter():
+    """Test that visual parameter works without errors"""
+    df = pd.DataFrame({
+        'Numeric': [1, 2, 3, 4, 5]
+        'Category': ['A', 'B', 'A', 'B', 'A']
+    })
+
+    # testing each function with visual = True (will ensure that no errors arise)
+    processed, report = explain_fill_missing(df, visual = True)
+    assert isinstance(report, dict)
+
+    processed, report = explain_encode(df, visual = True)
+    assert isinstance(report, dict)
+
+    processed, report = explain_scale(df, visual = True)
+    assert isinstance(report, dict)
+
+    processed, report = explain_outliers(df, visual = True)
+    assert isinstance(report, dict)
+
+    processed, report = explain_select_features(df, visual = True)
+    assert isinstance(report, dict)
