@@ -5,6 +5,7 @@ import seaborn as sns
 from sklearn.impute import SimpleImputer
 from .reports import ExplainReport
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, MinMaxScaler, StandardScaler, RobustScaler
+from sklearn.feature_selection import VarianceThreshold
 
 def _validate_df(df):
     if not isinstance(df, pd.DataFrame):
@@ -293,3 +294,99 @@ def explain_outliers(df: pd.DataFrame, method: str = 'iqr', threshold: float = 1
             plt.close()
 
     return df_copy, report
+
+def explain_select_features(df: pd.DataFrame, threshold: float = 0.01, columns: list = None, visual: bool = False) -> tuple:
+    """
+    Select features by variance with a detailed and a beginner ffriendly report.
+
+    Parameters:
+    - df: Input Dataframe.
+    - threshold: Variance threshold.
+    - columns: Columns to check.
+    - visual: plot variances.
+
+    Returns:
+    - processed_df, report_dict
+    """
+    _validate_df(df)
+    df_copy = df.copy()
+    if columns is None:
+        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+
+    report = {
+        'explanation': "Feature selection removes columns with low variance (i.e., nearly constant values) because they provide little information for models. Variance measures how spread out data is.",
+        'parameters': f"Variance Threshold: {threshold}, Columns: {columns or 'Auto detected numerics'}",
+        'stats': {'columns_before': list(df.columns), 'dropped': [], 'variances': {}},
+        'impact': "",
+        'tips': "Use a low threshold to keep more features, higher to be stricter. Check dropped columns to ensure no important data is lost."
+    }
+
+    for col in columns:
+        var = df_copy[col].var()
+        report['stats']['variances'][col] = f"Variance: {var:.4f}"
+        if var < threshold:
+            report['stats']['dropped'].append(col)
+
+    selector = VarianceThreshold(threshold = threshold)
+    numeric_df = df_copy[columns]
+    selected = selector.fit_transform(numeric_df)
+    selected_columns = numeric_df.columns[selector.get_support()].tolist()
+    df_copy = pd.concat([df_copy.drop(columns, axis =  1), df_copy[selected_columns]], axis = 1)
+
+    report['stats']['columns_after'] = list(df_copy.columns)
+    report['impact'] = f"Dropped {len(report['stats']['dropped'])} low variance columns."
+
+    if visual:
+        report['visuals'] = []
+        report['visual_descriptions'] = []
+        fig, ax = plt.subplots()
+        pd.Series({k: float(v.split(': ')[1]) for k, v in report['stats']['variances'].items()}).sort_values().plot(kind='barh', ax=ax)
+        ax.axvline(threshold, color='r', linestyle='--')
+        ax.set_title('Feature Variances')
+        report['visuals'].append('reports/variances.png')
+        report['visual_descriptions'].append("Bar plot: Shows variance of each numerical column. Red line is the threshold; bars below it are dropped.")
+        plt.savefig(report['visuals'][-1])
+        plt.close()
+
+    return df_copy, report
+
+def explain_preprocess(df: pd.DataFrame, steps: list = ['fill', 'encode', 'scale', 'outliers', 'select'], target: str = None, report_format: str = 'json', visual: bool = False) -> tuple:
+    """
+    Full preprocessing pipeline with a combined, detailed and a beginner friendly report.
+
+    Parameters:
+    - df: Input Dataframe.
+    - steps: List of steps to apply (in order).
+    - target: Target Column.
+    - report_format: 'json' or 'text'.
+    - visual: if True, generates visual plots for all steps.
+
+    Returns:
+    - processed_df, combined_report
+    """
+    _validate_df(df)
+    df_copy = df.copy()
+    if target and target in df_copy.columns:
+        target_col = df_copy.pop(target)        # protect target col
+
+    report = ExplainReport()
+
+    func_map = {
+        'fill': explain_fill_missing,
+        'encode': explain_encode,
+        'scale': explain_scale,
+        'outliers': explain_outliers,
+        'select': explain_select_features,
+    } 
+
+    for step in steps:
+        if step not in func_map:
+            raise ValueError(f"Invalid step: {step}")
+        df_copy, step_report = func_map[step](df_copy, visual = visual)
+        report.add_step(step, step_report)
+
+    if target and target in target_col.name:
+        df_copy[target] = target_col
+
+    combined = report.generate(format = report_format)
+    return df_copy, combined
