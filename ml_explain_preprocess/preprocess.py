@@ -40,7 +40,7 @@ def explain_fill_missing(df: pd.DataFrame, strategy: str = 'auto', columns: list
     }
 
     total_missing = df.isnull().sum().sum()
-    total_cells = df.size()
+    total_cells = df.size
     percent_missing = (total_missing / total_cells * 100) if total_cells > 0 else 0
 
     for col in columns:

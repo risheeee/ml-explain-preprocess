@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.ml_explain_preprocess import (
+from ml_explain_preprocess.preprocess import (
     explain_fill_missing,
     explain_encode,
     explain_scale,
