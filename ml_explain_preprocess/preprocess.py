@@ -311,7 +311,7 @@ def explain_select_features(df: pd.DataFrame, threshold: float = 0.01, columns: 
     _validate_df(df)
     df_copy = df.copy()
     if columns is None:
-        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+        columns = df.select_dtypes(include = ['number']).columns.tolist()
 
     report = {
         'explanation': "Feature selection removes columns with low variance (i.e., nearly constant values) because they provide little information for models. Variance measures how spread out data is.",
