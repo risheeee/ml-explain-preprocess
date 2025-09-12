@@ -53,9 +53,9 @@ def explain_fill_missing(df: pd.DataFrame, strategy: str = 'auto', columns: list
             strat = strategy
 
         imputer = SimpleImputer(strategy = strat, fill_value = 0 if strat == 'constant' else None)
-        df_copy[col] = imputer.fit_transform(df_copy[col])
+        df_copy[col] = imputer.fit_transform(df_copy[[col]])
 
-        report['stats']['startegies'][col] = strat
+        report['stats']['strategies'][col] = strat
         report['stats']['missing_after'][col] = f"{df_copy[col].isnull().sum()} missing"
 
     report['impact'] = f"Handled {total_missing} missing values ({percent_missing:.1f}% of data)."
@@ -122,13 +122,13 @@ def explain_encode(df: pd.DataFrame, method: str = 'auto', columns: list = None,
             encoded_df = pd.DataFrame(encoded, columns = encoder.get_feature_names_out(), index = df_copy.index)
             df_copy = pd.concat([df_copy.drop(col, axis=1), encoded_df], axis=1)
             report['stats']['methods'][col] = 'onehot'
-            report['stats']['new_columns'].extend(encoder.get_feature_names_out().tolist())
+            report['stats']['new_columns'][col] = encoder.get_feature_names_out().tolist()
         else:
             encoder = LabelEncoder()
             df_copy[col] = encoder.fit_transform(df_copy[col])
             report['stats']['methods'][col] = 'label'
 
-        report['stats']['uniques_after'][col] = "See new columns" if meth == 'onehot' else f"{df_copy[col].nunique()} unique values"
+        report['stats']['unique_after'][col] = "See new columns" if meth == 'onehot' else f"{df_copy[col].nunique()} unique values"
 
     new_cols = len(df_copy.columns) - len(original_cols)
     report['impact'] = f"Transformed {len(columns)} categorical columns, added {new_cols} new columns."

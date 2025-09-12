@@ -51,7 +51,7 @@ def test_explain_fill_missing_with_strategy(sample_df):
 
     # age should be filled with median
     original_median = sample_df['Age'].median()
-    filled_age = processed.iloc[sample_df['Age'].isnull(), 'Age'].iloc[0]
+    filled_age = processed.loc[sample_df['Age'].isnull(), 'Age'].iloc[0]
     assert filled_age == original_median
 
 def test_explain_fill_missing_empty_columns():
