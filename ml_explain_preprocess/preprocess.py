@@ -162,7 +162,7 @@ def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None
     _validate_df(df)
     df_copy = df.copy()
     if columns is None:
-        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+        columns = df.select_dtypes(include = ['int', 'float']).columns.tolist()
 
     report = {
         'explanation': "Scaling adjusts numerical features to a common range (e.g., 0 to 1) so that machine learning models treat all features equally. MinMax scales to [0,1], Standard scales to mean=0, std=1, Robust is outlier-resistant.",
@@ -174,7 +174,7 @@ def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None
 
     scalers = {
         'minmax': MinMaxScaler(),
-        'standard': StandardScaler,
+        'standard': StandardScaler(),
         'robust': RobustScaler(),
     }
     scaler = scalers.get(method, MinMaxScaler())
@@ -239,7 +239,7 @@ def explain_outliers(df: pd.DataFrame, method: str = 'iqr', threshold: float = 1
     _validate_df(df)
     df_copy = df.copy()
     if columns is None:
-        columns = df.select_dtypes(include = ['float', 'float']).columns.tolist()
+        columns = df.select_dtypes(include = ['int', 'float']).columns.tolist()
 
     report = {
         'explanation': "Outliers are extreme values that differ significantly from most data points. They can skew model training. IQR uses quartiles to detect outliers, z-score uses standard deviations.",
