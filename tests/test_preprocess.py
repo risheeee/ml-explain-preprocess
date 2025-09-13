@@ -177,20 +177,33 @@ def test_explain_select_features_basic(sample_df):
     assert 'Constant' in report['stats']['dropped']
 
 def test_explain_select_features_threshold():
-    """Tests different thresholds"""
+    """Test different thresholds"""
     df_variance = pd.DataFrame({
-        'LowVar': [1, 1, 1, 1, 2],       # low var
-        'HighVar': [1, 10, 20, 30, 40]     # High var
+        'LowVar': [1, 1, 1, 1, 2],  # Very low variance (var ≈ 0.2)
+        'HighVar': [1, 10, 20, 30, 40],  # High variance (var ≈ 239.5)
+        'NonNumeric': ['A', 'B', 'C', 'D', 'E']  # Add non-numeric column
     })
-
-    # with higher threshold, both might be dropped
-    processed, report = explain_select_features(df_variance, threshold = 50)
-
-    # with lower threshold only low variance should be dropped
-    processed2, report2 = explain_select_features(df_variance, threshold = 0.1)
-
-    assert 'HighVar' not in processed.columns
+    
+    # With very high threshold, all numeric columns should be dropped
+    processed, report = explain_select_features(df_variance, threshold=500)
+    numeric_cols_remaining = processed.select_dtypes(include=['float', 'int']).columns
+    assert len(numeric_cols_remaining) == 0
+    assert 'LowVar' in report['stats']['dropped']
+    assert 'HighVar' in report['stats']['dropped']
+    # Non-numeric column should still be there
+    assert 'NonNumeric' in processed.columns
+    
+    # With medium threshold, only low variance should be dropped
+    processed2, report2 = explain_select_features(df_variance, threshold=1.0)
     assert 'HighVar' in processed2.columns
+    assert 'LowVar' in report2['stats']['dropped']
+    assert 'HighVar' not in report2['stats']['dropped']
+    
+    # With very low threshold, both should be kept
+    processed3, report3 = explain_select_features(df_variance, threshold=0.1)
+    assert 'HighVar' in processed3.columns
+    assert 'LowVar' in processed3.columns
+    assert len(report3['stats']['dropped']) == 0
 
 def test_explain_preprocess_basic(sample_df):
     """Test full preprocessing pipeline"""

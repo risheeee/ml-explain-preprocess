@@ -329,9 +329,25 @@ def explain_select_features(df: pd.DataFrame, threshold: float = 0.01, columns: 
 
     selector = VarianceThreshold(threshold = threshold)
     numeric_df = df_copy[columns]
-    selected = selector.fit_transform(numeric_df)
-    selected_columns = numeric_df.columns[selector.get_support()].tolist()
-    df_copy = pd.concat([df_copy.drop(columns, axis =  1), df_copy[selected_columns]], axis = 1)
+    
+    try:
+        selected = selector.fit_transform(numeric_df)
+        selected_columns = numeric_df.columns[selector.get_support()].tolist()
+        
+        non_numeric_df = df_copy.drop(columns, axis = 1)
+        if selected_columns:  # If any columns remain after selection
+            df_copy = pd.concat([non_numeric_df, df_copy[selected_columns]], axis = 1)
+        else:  # If all numeric columns were dropped
+            df_copy = non_numeric_df
+            
+    except ValueError as e:
+        # Handle case where no features meet the threshold
+        if "No feature in X meets the variance threshold" in str(e):
+            # All numeric columns will be dropped
+            selected_columns = []
+            df_copy = df_copy.drop(columns, axis = 1)
+        else:
+            raise e
 
     report['stats']['columns_after'] = list(df_copy.columns)
     report['impact'] = f"Dropped {len(report['stats']['dropped'])} low variance columns."
