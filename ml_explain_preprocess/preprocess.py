@@ -108,11 +108,11 @@ def explain_encode(df: pd.DataFrame, method: str = 'auto', columns: list = None,
     original_cols = df_copy.columns.tolist()
 
     for col in columns:
-        uniques_before = df_copy[col].nunique()
-        report['stats']['unique_before'][col] = f"{uniques_before} unique values"
+        unique_before = df_copy[col].nunique()
+        report['stats']['unique_before'][col] = f"{unique_before} unique values"
 
         if method == 'auto':
-            meth = 'onehot' if uniques_before < 10 else 'label'
+            meth = 'onehot' if unique_before < 10 else 'label'
         else:
             meth = method
 
@@ -137,7 +137,7 @@ def explain_encode(df: pd.DataFrame, method: str = 'auto', columns: list = None,
         report['visuals'] = []
         report['visual_descriptions'] = []
         fig, ax = plt.subplots()
-        pd.Series({k: int(v.split()[0]) for k, v in report['stats']['uniques_before'].items()}).plot(kind='bar', ax=ax)
+        pd.Series({k: int(v.split()[0]) for k, v in report['stats']['unique_before'].items()}).plot(kind='bar', ax=ax)
         ax.set_title("Unique values before encoding")
         report['visuals'].append('reports/encode_uniques.png')
         report['visual_descriptions'].append("Bar plot: Shows number of unique values per categorical column before encoding.")

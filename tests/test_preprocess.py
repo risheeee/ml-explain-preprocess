@@ -1,6 +1,8 @@
 import pytest
 import pandas as pd
 import numpy as np
+import tempfile
+import os
 from ml_explain_preprocess.preprocess import (
     explain_fill_missing,
     explain_encode,
@@ -10,7 +12,7 @@ from ml_explain_preprocess.preprocess import (
     explain_preprocess
 )
 
-@pytest.fixture
+@pytest.fixture(scope = "function")
 def sample_df():
     return pd.DataFrame({
         'Age': [25, 30, None, 40, 35],
@@ -226,19 +228,37 @@ def test_explain_preprocess_with_target(sample_df):
     # target should be preserved in final df
     assert 'Income' in processed
 
+# earlier created sample df not working in this one
 def test_explain_preprocess_custom_steps():
-    """Testing preprocessing with custom steps"""
-    processed, report = explain_preprocess(sample_df, steps = ['fill', 'encode'])
+    """Test preprocessing with custom steps"""
+    sample_df = pd.DataFrame({
+        'Age': [25, 30, None, 40, 35],
+        'Gender': ['M', 'F', 'M', 'F', 'M'],
+        'Income': [50000, 60000, 55000, None, 70000],
+        'Constant': [1, 1, 1, 1, 1],
+        'Score': [85.5, 90.0, 78.5, 95.0, 88.0]
+    })
+    
+    processed, report = explain_preprocess(
+        sample_df, 
+        steps=['fill', 'encode']
+    )
+    
     assert isinstance(report, str)
     assert processed.shape[0] > 0
 
 def test_visual_parameter():
     """Test that visual parameter works without errors"""
-    df = pd.DataFrame({
-        'Numeric': [1, 2, 3, 4, 5],
-        'Category': ['A', 'B', 'A', 'B', 'A']
-    })
 
+    # create temporary directory for test plots
+    with tempfile.TemporaryDirectory() as temp_dir:
+        os.makedirs('reports', exist_ok=True)
+        
+        df = pd.DataFrame({
+            'Numeric': [1, 2, 3, 4, 5],
+            'Category': ['A', 'B', 'A', 'B', 'A']
+        })
+        
     # testing each function with visual = True (will ensure that no errors arise)
     processed, report = explain_fill_missing(df, visual = True)
     assert isinstance(report, dict)
