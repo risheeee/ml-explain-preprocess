@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import os
+import re
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.impute import SimpleImputer
@@ -61,21 +63,30 @@ def explain_fill_missing(df: pd.DataFrame, strategy: str = 'auto', columns: list
     report['impact'] = f"Handled {total_missing} missing values ({percent_missing:.1f}% of data)."
 
     if visual:
+        os.makedirs('reports', exist_ok=True)
+
         report['visuals'] = []
         report['visual_descriptions'] = []
-        fig, ax = plt.subplots()
-        sns.heatmap(df.isnull(), cbar = False, ax = ax)
-        report['visuals'].append('reports/missing_before.png')
-        report['visual_descriptions'].append("Heatmap (Before): Red shows missing values, white is non missing.")
-        plt.savefig(report['visuals'][-1])
-        plt.close()
 
-        fig, ax = plt.subplots()
-        sns.heatmap(df_copy.isnull(), cbar = False, ax = ax)
-        report['visuals'].append('reports/missing_after.png')
-        report['visual_descriptions'].append("Heatmap (After): Should be all white, if all missing values were filled.")
-        plt.savefig(report['visuals'][-1])
-        plt.close()
+        try:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.heatmap(df.isnull(), cbar=True, ax=ax, cmap='viridis')
+            ax.set_title('Missing Values - Before')
+            report['visuals'].append('reports/missing_before.png')
+            report['visual_descriptions'].append("Heatmap (Before): Yellow shows missing values, dark purple is non missing.")
+            plt.savefig(report['visuals'][-1], dpi=150, bbox_inches='tight')
+            plt.close()
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.heatmap(df_copy.isnull(), cbar=True, ax=ax, cmap='viridis')
+            ax.set_title('Missing Values - After')
+            report['visuals'].append('reports/missing_after.png')
+            report['visual_descriptions'].append("Heatmap (After): Should be all dark purple if all missing values were filled.")
+            plt.savefig(report['visuals'][-1], dpi=150, bbox_inches='tight')
+            plt.close()
+            
+        except Exception as e:
+            report['visual_descriptions'].append(f"Could not generate heatmap: {str(e)}")
 
     return df_copy, report
 
@@ -134,15 +145,40 @@ def explain_encode(df: pd.DataFrame, method: str = 'auto', columns: list = None,
     report['impact'] = f"Transformed {len(columns)} categorical columns, added {new_cols} new columns."
 
     if visual:
+        os.makedirs('reports', exist_ok=True)
+        
         report['visuals'] = []
         report['visual_descriptions'] = []
-        fig, ax = plt.subplots()
-        pd.Series({k: int(v.split()[0]) for k, v in report['stats']['unique_before'].items()}).plot(kind='bar', ax=ax)
-        ax.set_title("Unique values before encoding")
-        report['visuals'].append('reports/encode_uniques.png')
-        report['visual_descriptions'].append("Bar plot: Shows number of unique values per categorical column before encoding.")
-        plt.savefig(report['visuals'][-1])
-        plt.close()
+        
+        try:
+            # Check if there are any categorical columns to plot
+            if report['stats']['unique_before']: 
+                unique_counts = {}
+                for k, v in report['stats']['unique_before'].items():
+                    try:
+                        count = int(v.split()[0])
+                        unique_counts[k] = count
+                    except (ValueError, IndexError):
+                        continue
+                
+                if unique_counts:  # Only plot if we have data
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    pd.Series(unique_counts).plot(kind='bar', ax=ax)
+                    ax.set_title("Unique Values Before Encoding")
+                    ax.set_xlabel("Categorical Columns")
+                    ax.set_ylabel("Number of Unique Values")
+                    plt.xticks(rotation=45)
+                    report['visuals'].append('reports/encode_uniques.png')
+                    report['visual_descriptions'].append("Bar plot: Shows number of unique values per categorical column before encoding.")
+                    plt.savefig(report['visuals'][-1], dpi=150, bbox_inches='tight')
+                    plt.close()
+                else:
+                    report['visual_descriptions'].append("No categorical columns found - no bar plot generated.")
+            else:
+                report['visual_descriptions'].append("No categorical columns to encode - no visualization generated.")
+                
+        except Exception as e:
+            report['visual_descriptions'].append(f"Could not generate encoding plot: {str(e)}")
 
     return df_copy, report
 
@@ -204,20 +240,44 @@ def explain_scale(df: pd.DataFrame, method: str = 'minmax', columns: list = None
     report['impact'] = f"Scaled {len(columns)} numerical columns to {method} range."
 
     if visual:
-        report['visuals'] = [] 
+        os.makedirs('reports', exist_ok=True)
+        
+        report['visuals'] = []
         report['visual_descriptions'] = []
+        
         for col in columns:
-            fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-            df[col].hist(ax=axs[0], bins=20)
-            axs[0].set_title(f'{col} Before Scaling')
-            df_copy[col].hist(ax=axs[1], bins=20)
-            axs[1].set_title(f'{col} After Scaling')
-            plt.tight_layout()
-            filename = f'reports/scale_{col}.png'
-            report['visuals'].append(filename)
-            report['visual_descriptions'].append(f"Histograms for {col}: Left shows distribution before scaling, right shows after {method} scaling.")
-            plt.savefig(filename)
-            plt.close()
+            try:
+                # Check if column has valid numeric data
+                if df[col].notna().sum() > 0 and df_copy[col].notna().sum() > 0:
+                    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+                    
+                    # Plot before scaling
+                    df[col].hist(ax=axs[0], bins=20, alpha=0.7)
+                    axs[0].set_title(f'{col} Before Scaling')
+                    axs[0].set_xlabel('Value')
+                    axs[0].set_ylabel('Frequency')
+                    
+                    # Plot after scaling
+                    df_copy[col].hist(ax=axs[1], bins=20, alpha=0.7)
+                    axs[1].set_title(f'{col} After Scaling')
+                    axs[1].set_xlabel('Value')
+                    axs[1].set_ylabel('Frequency')
+
+                    plt.tight_layout()
+                    clean_col = re.sub(r'[^\w\-_.]', '_', col)
+                    filename = f'reports/scale_{clean_col}.png'
+                    
+                    report['visuals'].append(filename)
+                    report['visual_descriptions'].append(f"Histograms for {col}: Left shows distribution before scaling, right shows after {method} scaling.")
+                    
+                    plt.savefig(filename, dpi=150, bbox_inches='tight')
+                    plt.close()
+                else:
+                    report['visual_descriptions'].append(f"Skipped histogram for {col}: No valid data to plot.")
+                    
+            except Exception as e:
+                report['visual_descriptions'].append(f"Could not generate histogram for {col}: {str(e)}")
+                plt.close('all')
 
     return df_copy, report
 
@@ -278,20 +338,70 @@ def explain_outliers(df: pd.DataFrame, method: str = 'iqr', threshold: float = 1
     report['impact'] = f"Processed {total_outliers} outliers accross {len(columns)} columns."
 
     if visual:
+        os.makedirs('reports', exist_ok=True)  # Fix: Create directory
+        
         report['visuals'] = []
         report['visual_descriptions'] = []
+        
         for col in columns:
-            fig, axs = plt.subplots(1, 2, figsize = (10, 4))
-            sns.boxplot(y=df[col], ax=axs[0])
-            axs[0].set_title(f'{col} Before')
-            sns.boxplot(y=df_copy[col], ax=axs[1])
-            axs[1].set_title(f'{col} After')
-            plt.tight_layout()
-            filename = f'reports/outliers_{col}.png'
-            report['visuals'].append(filename)
-            report['visual_descriptions'].append(f"Boxplots for {col}: Left shows outliers as points beyond whiskers, right shows after {action}.")
-            plt.savefig(filename)
-            plt.close()
+            try:
+                # Check if column has valid numeric data
+                if df[col].notna().sum() > 1: 
+                    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+                    
+                    # Plot before outlier handling
+                    sns.boxplot(y=df[col], ax=axs[0])
+                    axs[0].set_title(f'{col} Before')
+                    axs[0].set_ylabel('Value')
+                    
+                    # Plot after outlier handling
+                    if action == 'remove' and len(df_copy) != len(df):
+                        if method == 'iqr':
+                            Q1 = df[col].quantile(0.25)
+                            Q3 = df[col].quantile(0.75)
+                            IQR = Q3 - Q1
+                            lower = Q1 - threshold * IQR
+                            upper = Q3 + threshold * IQR
+                            non_outliers = df[col][(df[col] >= lower) & (df[col] <= upper)]
+                        else:  # zscore
+                            z = np.abs((df[col] - df[col].mean()) / df[col].std())
+                            non_outliers = df[col][z <= threshold]
+                        
+                        sns.boxplot(y=non_outliers, ax=axs[1])
+                        axs[1].set_title(f'{col} After (Outliers Removed)')
+                    else:
+                        # For clipping or reporting: show the modified data
+                        sns.boxplot(y=df_copy[col], ax=axs[1])
+                        if action == 'clip':
+                            axs[1].set_title(f'{col} After (Outliers Clipped)')
+                        else:
+                            axs[1].set_title(f'{col} After')
+                    
+                    axs[1].set_ylabel('Value')
+                    plt.tight_layout()
+
+                    clean_col = re.sub(r'[^\w\-_.]', '_', col)
+                    filename = f'reports/outliers_{clean_col}.png'
+                    
+                    report['visuals'].append(filename)
+                    
+                    if action == 'remove':
+                        description = f"Boxplots for {col}: Left shows original data with outliers, right shows data that would remain after removing outliers."
+                    elif action == 'clip':
+                        description = f"Boxplots for {col}: Left shows original data, right shows data after clipping outliers to threshold boundaries."
+                    else:
+                        description = f"Boxplots for {col}: Left shows original data with outliers as points beyond whiskers, right shows the same data (report only)."
+                    
+                    report['visual_descriptions'].append(description)
+                    plt.savefig(filename, dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                else:
+                    report['visual_descriptions'].append(f"Skipped boxplot for {col}: Not enough valid data points.")
+                    
+            except Exception as e:
+                report['visual_descriptions'].append(f"Could not generate boxplot for {col}: {str(e)}")
+                plt.close('all')
 
     return df_copy, report
 
@@ -353,16 +463,73 @@ def explain_select_features(df: pd.DataFrame, threshold: float = 0.01, columns: 
     report['impact'] = f"Dropped {len(report['stats']['dropped'])} low variance columns."
 
     if visual:
+        os.makedirs('reports', exist_ok=True) 
+        
         report['visuals'] = []
         report['visual_descriptions'] = []
-        fig, ax = plt.subplots()
-        pd.Series({k: float(v.split(': ')[1]) for k, v in report['stats']['variances'].items()}).sort_values().plot(kind='barh', ax=ax)
-        ax.axvline(threshold, color='r', linestyle='--')
-        ax.set_title('Feature Variances')
-        report['visuals'].append('reports/variances.png')
-        report['visual_descriptions'].append("Bar plot: Shows variance of each numerical column. Red line is the threshold; bars below it are dropped.")
-        plt.savefig(report['visuals'][-1])
-        plt.close()
+        
+        try:
+            # Check if there are any variances to plot
+            if report['stats']['variances']:
+                variance_data = {}
+                for k, v in report['stats']['variances'].items():
+                    try:
+                        # Extract variance 
+                        if ': ' in v:
+                            variance_val = float(v.split(': ')[1])
+                            variance_data[k] = variance_val
+                        else:
+                            variance_data[k] = float(v)
+                    except (ValueError, IndexError):
+                        continue
+                
+                if variance_data:  # Only plot if we have valid data
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    
+                    # Create horizontal bar plot
+                    variance_series = pd.Series(variance_data).sort_values()
+                    variance_series.plot(kind='barh', ax=ax)
+                    
+                    # Add threshold line
+                    ax.axvline(threshold, color='r', linestyle='--', linewidth=2, label=f'Threshold ({threshold})')
+
+                    ax.set_title('Feature Variances', fontsize=14, fontweight='bold')
+                    ax.set_xlabel('Variance', fontsize=12)
+                    ax.set_ylabel('Features', fontsize=12)
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Color bars based on whether they meet threshold
+                    bars = ax.patches
+                    for i, (feature, var_val) in enumerate(variance_series.items()):
+                        if var_val < threshold:
+                            bars[i].set_color('red')
+                            bars[i].set_alpha(0.7)
+                        else:
+                            bars[i].set_color('green')
+                            bars[i].set_alpha(0.7)
+                    
+                    plt.tight_layout()
+                    
+                    report['visuals'].append('reports/variances.png')
+                    
+                    dropped_count = len([v for v in variance_data.values() if v < threshold])
+                    kept_count = len(variance_data) - dropped_count
+                    
+                    description = f"Bar plot: Shows variance of each numerical column. Red dashed line is the threshold ({threshold}). Red bars (low variance) will be dropped ({dropped_count} features), green bars (high variance) will be kept ({kept_count} features)."
+                    report['visual_descriptions'].append(description)
+                    
+                    plt.savefig(report['visuals'][-1], dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                else:
+                    report['visual_descriptions'].append("No valid variance data found - no bar plot generated.")
+            else:
+                report['visual_descriptions'].append("No numerical columns to analyze - no variance plot generated.")
+                
+        except Exception as e:
+            report['visual_descriptions'].append(f"Could not generate variance plot: {str(e)}")
+            plt.close('all')
 
     return df_copy, report
 
