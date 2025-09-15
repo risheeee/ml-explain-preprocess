@@ -5,10 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ml-explain-preprocess"
 version = "0.1.0"
-description = "An explainable preprocessing package for ML data preparation with reports."
+description = "Explainable preprocessing for ML pipelines with reports and visualizations."
 authors = [{name = "Rishee Panchal", email = "backpropnomad@gmail.com"}]
-license = {text = "MIT"}
-readme = {file = "README.md", content-type = "text/markdown"}
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "pandas>=1.5.0",
@@ -21,11 +22,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+[tool.setuptools]
+packages = ["ml_explain_preprocess"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -35,5 +36,4 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [project.urls]
-Homepage = "https://github.com/risheeee/ml-explain-preprocess"
 Repository = "https://github.com/risheeee/ml-explain-preprocess.git"
