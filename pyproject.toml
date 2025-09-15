@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ml-explain-preprocess"
-version = "0.1.0"
+version = "0.1.1"
 description = "Explainable preprocessing for ML pipelines with reports and visualizations."
 authors = [{name = "Rishee Panchal", email = "backpropnomad@gmail.com"}]
 license = "MIT"
